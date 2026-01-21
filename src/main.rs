@@ -1,5 +1,8 @@
 use std::fs;
 
+const DEBUG_READ_PRINT: bool = false;
+const DEBUG_STATS_PRINT: bool = true;
+
 struct Stats {
     byte: [u8; 256],
 }
@@ -20,7 +23,9 @@ impl Huff {
                 return;
             }
         };
-        println!("{:?}", data);
+        if DEBUG_READ_PRINT { 
+            println!("data read: {:?}", data); 
+        }
         self.stats = Some(self.calc_stats_from_data(&data));
     }
 
@@ -29,10 +34,12 @@ impl Huff {
         for val in data.iter() {
             stats.byte[*val as usize] += 1;
         }
-        println!("data stats");
-        for (idx, elem) in stats.byte.iter().enumerate() {
-            if *elem > 0 {
-                println!("{:#2X}: {}", idx, *elem);
+        if DEBUG_STATS_PRINT {
+            println!("data stats:");
+            for (idx, elem) in stats.byte.iter().enumerate() {
+                if *elem > 0 {
+                    println!("0x{:02X}: {}", idx, *elem);
+                }
             }
         }
         stats
