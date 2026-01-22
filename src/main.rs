@@ -5,18 +5,23 @@ use std::env;
 const VERBOSE_EN: bool = true;
 
 struct Stats {
-    byte: [u8; 256],
+    byte: [u32; 256],
 }
 
 enum NodeData {
-    Head,
-    Leaf(u32),
+    Branch,
+    Leaf(u8),
 }
 
 struct Node {
     data: NodeData,
+    weight: u32,
     left: Option<Box<Node>>,
     right: Option<Box<Node>>,
+}
+
+struct Tree {
+    root: Option<Node>,
 }
 
 impl Stats {
@@ -40,6 +45,22 @@ impl Stats {
                 println!("{:02X}: {}", idx, *elem);
             }
         } 
+    }
+
+    fn as_vector(&self) -> Vec<Node> {
+      let mut vec = Vec::new();
+      for (idx, elem) in self.byte.iter().enumerate() {
+        if *elem > 0 {
+          vec.push(Node { data: NodeData::Leaf(idx as u8), weight: *elem, left: None, right: None });
+        }
+      }
+      vec
+    }
+}
+
+impl Tree {
+    fn from_stats(stats: &Stats) -> Tree {
+        Tree { root: None }
     }
 }
 
