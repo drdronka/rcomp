@@ -7,14 +7,22 @@ const VERBOSE_EN: bool = true;
 struct Stats {
     byte: [u8; 256],
 }
-struct Huff {
-    stats: Option<Stats>,
+
+enum NodeData {
+    Head,
+    Leaf(u32),
+}
+
+struct Node {
+    data: NodeData,
+    left: Option<Box<Node>>,
+    right: Option<Box<Node>>,
 }
 
 impl Stats {
     fn from_file(path_in: &str) -> Result<Stats, std::io::Error> {
         let data = fs::read(path_in)?;
-        return Ok(Stats::from_data(&data));
+        Ok(Stats::from_data(&data))
     }
 
     fn from_data(data: &Vec<u8>) -> Stats {
@@ -35,11 +43,6 @@ impl Stats {
     }
 }
 
-impl Huff {
-    fn calc_tree(&self) {
-    }
-}
-
 fn compress(path_in: &str, path_out: &str, verbose: bool) {
     println!("starting compression");
     println!("input file: {}", path_in);
@@ -49,6 +52,9 @@ fn compress(path_in: &str, path_out: &str, verbose: bool) {
     let stats: Stats = match Stats::from_file(path_in) {
         Ok(stats) => {
             println!("done");
+            if verbose {
+                stats.print();
+            }
             stats
         },
         Err(msg) => {
@@ -57,17 +63,11 @@ fn compress(path_in: &str, path_out: &str, verbose: bool) {
         },
     };
 
-    if verbose {
-        stats.print();
-    }
-
     println!("calculating huffman tree");
 }
 
 fn main() {
-    let mut huff = Huff { stats: None };
     let args: Vec<String> = env::args().collect();
-
     if args.len() <= 2 {
         println!("usage: {} [src_file] [dst_file]", args[0].split('/').last().unwrap());
         return;
