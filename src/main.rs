@@ -9,13 +9,13 @@ struct Stats {
     byte: [u32; 256],
 }
 
-enum NodeData {
+enum NodeType {
     Branch,
     Leaf(u8),
 }
 
 struct Node {
-    data: NodeData,
+    data: NodeType,
     weight: u32,
     next: Option<Box<Node>>,
     left: Option<Box<Node>>,
@@ -53,11 +53,18 @@ impl Stats {
 impl Treelist {
     fn from_stats(stats: &Stats) -> Treelist {
         let mut treelist = Treelist { root: None };
-        for (idx, elem) in stats.byte.iter().enumerate() {
-            if *elem > 0 {
-                treelist.add_sorted(idx as u8, *elem as u32);
+        for (idx, weight) in stats.byte.iter().enumerate() {
+            if *weight > 0 {
+                let mut new_node = Box::new( Node { 
+                    data: NodeType::Leaf(idx as u8), 
+                    weight: *weight,
+                    next: None,
+                    left: None,
+                    right: None});
+                treelist.add_sorted(new_node);
             }
         }
+        treelist.transform();
         treelist
     }
 
@@ -68,7 +75,7 @@ impl Treelist {
             match &tmp_node {
                 Some(node) => {
                     match &node.data {
-                        NodeData::Leaf(data) => {
+                        NodeType::Leaf(data) => {
                             debug!("({:02X}:{})", data, node.weight);
                             tmp_node = &node.next;
                         }
@@ -80,45 +87,42 @@ impl Treelist {
         }
     }
 
-    fn add_sorted(&mut self, byte: u8, weight: u32) {    
-        let mut new_node = Box::new( Node { 
-            data: NodeData::Leaf(byte), 
-            weight: weight,
-            next: None,
-            left: None,
-            right: None});
-
+//    fn add_sorted(&mut self, byte: u8, weight: u32) {    
+    fn add_sorted(&mut self, mut new_node: Box<Node>) {
+        match new_node.data {
+            NodeType::Branch => debug!("adding branch"),
+            NodeType::Leaf(byte) => debug!("adding leaf: ({:02X}:{})", byte, new_node.weight),
+        };
         match &self.root {
             None => { 
                 // add as only
-                debug!("adding only ({:02X}:{})", byte, weight);
+                debug!("-> head (first)");
                 self.root = Some(new_node);
                 return;
             },
             Some(node) => {
                 // add as first
-                if node.weight >= weight {
-                    debug!("adding first ({:02X}:{})", byte, weight);
+                if node.weight >= new_node.weight {
+                    debug!("-> head");
                     new_node.next = self.root.take();
                     self.root = Some(new_node);
                     return;
                 }
             }
         }
-
         let mut tmp_node = &mut self.root;
         loop {
             match tmp_node {
                 Some(node1) => {
                     match &node1.next {
                         None => {
-                            debug!("adding last ({:02X}:{})", byte, weight);
+                            debug!("-> tail");
                             node1.next = Some(new_node);
                             return;
                         },
                         Some(node2) => {
-                            if node2.weight >= weight {
-                                debug!("adding middle ({:02X}:{})", byte, weight);
+                            if node2.weight >= new_node.weight {
+                                debug!("-> middle");
                                 new_node.next = node1.next.take();
                                 node1.next = Some(new_node);
                                 return;
@@ -135,6 +139,30 @@ impl Treelist {
                     return;
                 },
             }
+        }
+    }
+
+    fn has_elements(&self, n: u32) -> bool {
+        let mut cnt = 0u32;
+        let mut tmp_node = &self.root;
+        loop {
+            match tmp_node {
+                Some(node) => {
+                    cnt += 1;
+                    if cnt >= n {
+                        return true;
+                    }
+                    tmp_node = &node.next;
+                },
+                None => return false,
+            }
+        }
+    }
+
+    fn transform(&mut self) {
+        debug!("transforming treelist");
+        if self.has_elements(2) {
+//            let new_branch =
         }
     }
 }
