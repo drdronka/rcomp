@@ -4,6 +4,7 @@ use std::fs;
 use std::env;
 use log::{debug, error, log_enabled, info, Level, LevelFilter};
 use env_logger::Builder;
+use std::process;
 
 struct Stats {
     byte: [u32; 256],
@@ -64,7 +65,6 @@ impl Treelist {
                 treelist.add_sorted(new_node);
             }
         }
-        treelist.transform();
         treelist
     }
 
@@ -90,7 +90,7 @@ impl Treelist {
 //    fn add_sorted(&mut self, byte: u8, weight: u32) {    
     fn add_sorted(&mut self, mut new_node: Box<Node>) {
         match new_node.data {
-            NodeType::Branch => debug!("adding branch"),
+            NodeType::Branch => debug!("adding branch: {}", new_node.weight),
             NodeType::Leaf(byte) => debug!("adding leaf: ({:02X}:{})", byte, new_node.weight),
         };
         match &self.root {
@@ -160,9 +160,36 @@ impl Treelist {
     }
 
     fn transform(&mut self) {
-        debug!("transforming treelist");
-        if self.has_elements(2) {
-//            let new_branch =
+        while self.has_elements(2) {
+            let mut new_branch = Box::new(Node {
+                data: NodeType::Branch,
+                weight: 0,
+                next: None,
+                left: None,
+                right: None
+            });
+            new_branch.left = self.root.take();
+            new_branch.right = match new_branch.left {
+                Some(ref mut node) => {
+                    new_branch.weight += node.weight;
+                    node.next.take()
+                },
+                None => {
+                    error!("invalid state");
+                    return;
+                }
+            };
+            self.root = match new_branch.right {
+                Some(ref mut node) => { 
+                    new_branch.weight += node.weight;
+                    node.next.take()
+                },
+                None => {
+                    error!("invalid state");
+                    return;
+                }
+            };
+            self.add_sorted(new_branch);
         }
     }
 }
@@ -186,11 +213,13 @@ fn compress(path_in: &str, path_out: &str) {
         },
     };
 
-    info!("calculating huffman tree");
-    let treelist = Treelist::from_stats(&stats);
+    info!("creating treelist");
+    let mut treelist = Treelist::from_stats(&stats);
     if log_enabled!(Level::Debug) {
         treelist.print();
     }
+    info!("transforming treelist");
+    treelist.transform();
 }
 
 fn main() {
