@@ -55,18 +55,89 @@ impl Treelist {
     fn from_stats(stats: &Stats) -> Treelist {
         let mut treelist = Treelist { root: None };
         for (idx, elem) in stats.byte.iter().enumerate() {
-            treelist.add(idx as u8, *elem as u32);
+            if *elem > 0 {
+                treelist.add_sorted(idx as u8, *elem as u32);
+            }
         }
-        Treelist { root: None }
+        treelist
     }
-    fn add(&mut self, byte: u8, weight: u32) {
-        let new_node = Box::new( Node { 
+
+    fn print_flat(&self) {
+        println!("treelist:");
+        let mut tmp_node = &self.root;
+        loop {
+            match &tmp_node {
+                Some(node) => {
+                    match &node.data {
+                        NodeData::Leaf(data) => {
+                            println!("{:02X} {}", data, node.weight);
+                            tmp_node = &node.next;
+                        }
+                        _ => (),
+                    }
+                },
+                None => return,
+            }
+        }
+    }
+
+    fn add_sorted(&mut self, byte: u8, weight: u32) {    
+        let mut new_node = Box::new( Node { 
             data: NodeData::Leaf(byte), 
             weight: weight,
-            next: self.root.take(),
+            next: None,
             left: None,
             right: None});
-        self.root = Some(new_node);
+
+        match &self.root {
+            None => { 
+                // add as only
+                println!("adding only");
+                self.root = Some(new_node);
+                return;
+            },
+            Some(node) => {
+                // add as first
+                if node.weight >= weight {
+                    println!("adding first");
+                    new_node.next = self.root.take();
+                    self.root = Some(new_node);
+                    return;
+                }
+            }
+        }
+
+        println!("adding middle");
+        let mut tmp_node = &mut self.root;
+        loop {
+            match tmp_node {
+                Some(node1) => {
+                    match &node1.next {
+                        None => {
+                            println!("adding last");
+                            node1.next = Some(new_node);
+                            return;
+                        },
+                        Some(node2) => {
+                            if node2.weight >= weight {
+                                println!("adding middle");
+                                new_node.next = node1.next.take();
+                                node1.next = Some(new_node);
+                                return;
+                            }
+                            else {
+                                println!("iterating");
+                                tmp_node = &mut node1.next;
+                            }
+                        },
+                    }
+                },
+                _ => {
+                    println!("invalid state");
+                    return;
+                },
+            }
+        }
     }
 }
 
@@ -92,6 +163,9 @@ fn compress(path_in: &str, path_out: &str, verbose: bool) {
 
     println!("calculating huffman tree");
     let treelist = Treelist::from_stats(&stats);
+    if verbose {
+        treelist.print_flat();
+    }
 }
 
 fn main() {
