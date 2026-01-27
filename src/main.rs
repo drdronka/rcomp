@@ -2,7 +2,8 @@
 
 use std::fs;
 use std::env;
-use log::{debug, error, log_enabled, info, Level};
+use log::{debug, error, log_enabled, info, Level, LevelFilter};
+use env_logger::Builder;
 
 struct Stats {
     byte: [u32; 256],
@@ -68,7 +69,7 @@ impl Treelist {
                 Some(node) => {
                     match &node.data {
                         NodeData::Leaf(data) => {
-                            debug!("{:02X}: {}", data, node.weight);
+                            debug!("({:02X}:{})", data, node.weight);
                             tmp_node = &node.next;
                         }
                         _ => (),
@@ -123,7 +124,7 @@ impl Treelist {
                                 return;
                             }
                             else {
-                                debug!("iterating");
+                                //debug!("iterating");
                                 tmp_node = &mut node1.next;
                             }
                         },
@@ -139,7 +140,7 @@ impl Treelist {
 }
 
 fn compress(path_in: &str, path_out: &str) {
-    info!("starting compression");
+    info!("starting huffman compression");
     info!("input file: {}", path_in);
     info!("output file: {}", path_out);
 
@@ -165,7 +166,9 @@ fn compress(path_in: &str, path_out: &str) {
 }
 
 fn main() {
-    env_logger::init();
+    Builder::new()
+        .filter_level(LevelFilter::Debug)
+        .init();
 
     let args: Vec<String> = env::args().collect();
     if args.len() <= 2 {
