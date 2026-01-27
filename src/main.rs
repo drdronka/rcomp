@@ -1,9 +1,9 @@
 #![allow(unused)]
 
-use std::fs;
-use std::env;
-use log::{debug, error, log_enabled, info, Level, LevelFilter};
 use env_logger::Builder;
+use log::{debug, error, info, log_enabled, Level, LevelFilter};
+use std::env;
+use std::fs;
 use std::process;
 
 struct Stats {
@@ -47,7 +47,7 @@ impl Stats {
             if *elem > 0 {
                 debug!("({:02X}:{})", idx, *elem);
             }
-        } 
+        }
     }
 }
 
@@ -56,12 +56,13 @@ impl Treelist {
         let mut treelist = Treelist { root: None };
         for (idx, weight) in stats.byte.iter().enumerate() {
             if *weight > 0 {
-                let mut new_node = Box::new( Node { 
-                    data: NodeType::Leaf(idx as u8), 
+                let mut new_node = Box::new(Node {
+                    data: NodeType::Leaf(idx as u8),
                     weight: *weight,
                     next: None,
                     left: None,
-                    right: None});
+                    right: None,
+                });
                 treelist.add_sorted(new_node);
             }
         }
@@ -76,30 +77,36 @@ impl Treelist {
                 Some(node) => {
                     match &node.data {
                         NodeType::Leaf(data) => {
-                            debug!("({:02X}:{})", data, node.weight);
-                            tmp_node = &node.next;
+                            debug!("leaf ({:02X}:{})", data, node.weight);
                         }
-                        _ => (),
+                        NodeType::Branch => {
+                            debug!("branch ({})", node.weight);
+                        }
                     }
-                },
+                    tmp_node = &node.next;
+                }
                 None => return,
             }
         }
     }
 
-//    fn add_sorted(&mut self, byte: u8, weight: u32) {    
+    //    fn add_sorted(&mut self, byte: u8, weight: u32) {
     fn add_sorted(&mut self, mut new_node: Box<Node>) {
         match new_node.data {
-            NodeType::Branch => debug!("adding branch: {}", new_node.weight),
-            NodeType::Leaf(byte) => debug!("adding leaf: ({:02X}:{})", byte, new_node.weight),
-        };
+            NodeType::Branch => {
+                debug!("adding branch: {}", new_node.weight);
+            }
+            NodeType::Leaf(byte) => {
+                debug!("adding leaf: ({:02X}:{})", byte, new_node.weight);
+            }
+        }
         match &self.root {
-            None => { 
+            None => {
                 // add as only
                 debug!("-> head (first)");
                 self.root = Some(new_node);
                 return;
-            },
+            }
             Some(node) => {
                 // add as first
                 if node.weight >= new_node.weight {
@@ -119,25 +126,24 @@ impl Treelist {
                             debug!("-> tail");
                             node1.next = Some(new_node);
                             return;
-                        },
+                        }
                         Some(node2) => {
                             if node2.weight >= new_node.weight {
                                 debug!("-> middle");
                                 new_node.next = node1.next.take();
                                 node1.next = Some(new_node);
                                 return;
-                            }
-                            else {
+                            } else {
                                 //debug!("iterating");
                                 tmp_node = &mut node1.next;
                             }
-                        },
+                        }
                     }
-                },
+                }
                 _ => {
                     error!("invalid state");
                     return;
-                },
+                }
             }
         }
     }
@@ -153,7 +159,7 @@ impl Treelist {
                         return true;
                     }
                     tmp_node = &node.next;
-                },
+                }
                 None => return false,
             }
         }
@@ -166,24 +172,24 @@ impl Treelist {
                 weight: 0,
                 next: None,
                 left: None,
-                right: None
+                right: None,
             });
             new_branch.left = self.root.take();
             new_branch.right = match new_branch.left {
                 Some(ref mut node) => {
                     new_branch.weight += node.weight;
                     node.next.take()
-                },
+                }
                 None => {
                     error!("invalid state");
                     return;
                 }
             };
             self.root = match new_branch.right {
-                Some(ref mut node) => { 
+                Some(ref mut node) => {
                     new_branch.weight += node.weight;
                     node.next.take()
-                },
+                }
                 None => {
                     error!("invalid state");
                     return;
@@ -206,11 +212,11 @@ fn compress(path_in: &str, path_out: &str) {
                 stats.print();
             }
             stats
-        },
+        }
         Err(msg) => {
             error!("failed to calculate stats: {}", msg);
             return;
-        },
+        }
     };
 
     info!("creating treelist");
@@ -218,8 +224,12 @@ fn compress(path_in: &str, path_out: &str) {
     if log_enabled!(Level::Debug) {
         treelist.print();
     }
+
     info!("transforming treelist");
     treelist.transform();
+    if log_enabled!(Level::Debug) {
+        treelist.print();
+    }
 }
 
 fn main() {
@@ -227,7 +237,10 @@ fn main() {
 
     let args: Vec<String> = env::args().collect();
     if args.len() <= 2 {
-        info!("usage: {} [src_file] [dst_file]", args[0].split('/').last().unwrap());
+        info!(
+            "usage: {} [src_file] [dst_file]",
+            args[0].split('/').last().unwrap()
+        );
         return;
     }
 
