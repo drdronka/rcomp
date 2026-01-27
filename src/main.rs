@@ -1,3 +1,5 @@
+#![allow(unused)]
+
 use std::fs;
 use std::env;
 //use log::debug;
@@ -16,12 +18,13 @@ enum NodeData {
 struct Node {
     data: NodeData,
     weight: u32,
+    next: Option<Box<Node>>,
     left: Option<Box<Node>>,
     right: Option<Box<Node>>,
 }
 
-struct Tree {
-    root: Option<Node>,
+struct Treelist {
+    root: Option<Box<Node>>,
 }
 
 impl Stats {
@@ -46,21 +49,24 @@ impl Stats {
             }
         } 
     }
-
-    fn as_vector(&self) -> Vec<Node> {
-      let mut vec = Vec::new();
-      for (idx, elem) in self.byte.iter().enumerate() {
-        if *elem > 0 {
-          vec.push(Node { data: NodeData::Leaf(idx as u8), weight: *elem, left: None, right: None });
-        }
-      }
-      vec
-    }
 }
 
-impl Tree {
-    fn from_stats(stats: &Stats) -> Tree {
-        Tree { root: None }
+impl Treelist {
+    fn from_stats(stats: &Stats) -> Treelist {
+        let mut treelist = Treelist { root: None };
+        for (idx, elem) in stats.byte.iter().enumerate() {
+            treelist.add(idx as u8, *elem as u32);
+        }
+        Treelist { root: None }
+    }
+    fn add(&mut self, byte: u8, weight: u32) {
+        let new_node = Box::new( Node { 
+            data: NodeData::Leaf(byte), 
+            weight: weight,
+            next: self.root.take(),
+            left: None,
+            right: None});
+        self.root = Some(new_node);
     }
 }
 
@@ -85,6 +91,7 @@ fn compress(path_in: &str, path_out: &str, verbose: bool) {
     };
 
     println!("calculating huffman tree");
+    let treelist = Treelist::from_stats(&stats);
 }
 
 fn main() {
