@@ -1,1 +1,1 @@
-RUST_LOG=rcomp=debug cargo run "$@"
+cargo run test_in test_out

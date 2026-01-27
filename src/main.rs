@@ -166,9 +166,7 @@ fn compress(path_in: &str, path_out: &str) {
 }
 
 fn main() {
-    Builder::new()
-        .filter_level(LevelFilter::Debug)
-        .init();
+    Builder::new().filter_level(LevelFilter::Debug).init();
 
     let args: Vec<String> = env::args().collect();
     if args.len() <= 2 {
