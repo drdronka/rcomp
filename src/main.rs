@@ -2,9 +2,7 @@
 
 use std::fs;
 use std::env;
-//use log::debug;
-
-const VERBOSE_EN: bool = true;
+use log::{debug, error, log_enabled, info, Level};
 
 struct Stats {
     byte: [u32; 256],
@@ -42,10 +40,10 @@ impl Stats {
     }
 
     fn print(&self) {
-        println!("stats:");
+        debug!("stats:");
         for (idx, elem) in self.byte.iter().enumerate() {
             if *elem > 0 {
-                println!("{:02X}: {}", idx, *elem);
+                debug!("({:02X}:{})", idx, *elem);
             }
         } 
     }
@@ -62,15 +60,15 @@ impl Treelist {
         treelist
     }
 
-    fn print_flat(&self) {
-        println!("treelist:");
+    fn print(&self) {
+        debug!("treelist:");
         let mut tmp_node = &self.root;
         loop {
             match &tmp_node {
                 Some(node) => {
                     match &node.data {
                         NodeData::Leaf(data) => {
-                            println!("{:02X} {}", data, node.weight);
+                            debug!("{:02X}: {}", data, node.weight);
                             tmp_node = &node.next;
                         }
                         _ => (),
@@ -92,14 +90,14 @@ impl Treelist {
         match &self.root {
             None => { 
                 // add as only
-                println!("adding only");
+                debug!("adding only ({:02X}:{})", byte, weight);
                 self.root = Some(new_node);
                 return;
             },
             Some(node) => {
                 // add as first
                 if node.weight >= weight {
-                    println!("adding first");
+                    debug!("adding first ({:02X}:{})", byte, weight);
                     new_node.next = self.root.take();
                     self.root = Some(new_node);
                     return;
@@ -107,33 +105,32 @@ impl Treelist {
             }
         }
 
-        println!("adding middle");
         let mut tmp_node = &mut self.root;
         loop {
             match tmp_node {
                 Some(node1) => {
                     match &node1.next {
                         None => {
-                            println!("adding last");
+                            debug!("adding last ({:02X}:{})", byte, weight);
                             node1.next = Some(new_node);
                             return;
                         },
                         Some(node2) => {
                             if node2.weight >= weight {
-                                println!("adding middle");
+                                debug!("adding middle ({:02X}:{})", byte, weight);
                                 new_node.next = node1.next.take();
                                 node1.next = Some(new_node);
                                 return;
                             }
                             else {
-                                println!("iterating");
+                                debug!("iterating");
                                 tmp_node = &mut node1.next;
                             }
                         },
                     }
                 },
                 _ => {
-                    println!("invalid state");
+                    error!("invalid state");
                     return;
                 },
             }
@@ -141,43 +138,40 @@ impl Treelist {
     }
 }
 
-fn compress(path_in: &str, path_out: &str, verbose: bool) {
-    println!("starting compression");
-    println!("input file: {}", path_in);
-    println!("output file: {}", path_out);
+fn compress(path_in: &str, path_out: &str) {
+    info!("starting compression");
+    info!("input file: {}", path_in);
+    info!("output file: {}", path_out);
 
-    print!("calculating stats.. ");
+    info!("calculating stats");
     let stats: Stats = match Stats::from_file(path_in) {
         Ok(stats) => {
-            println!("done");
-            if verbose {
+            if log_enabled!(Level::Debug) {
                 stats.print();
             }
             stats
         },
         Err(msg) => {
-            println!("failed: {}", msg);
+            error!("failed to calculate stats: {}", msg);
             return;
         },
     };
 
-    println!("calculating huffman tree");
+    info!("calculating huffman tree");
     let treelist = Treelist::from_stats(&stats);
-    if verbose {
-        treelist.print_flat();
+    if log_enabled!(Level::Debug) {
+        treelist.print();
     }
 }
 
 fn main() {
+    env_logger::init();
+
     let args: Vec<String> = env::args().collect();
     if args.len() <= 2 {
-        println!("usage: {} [src_file] [dst_file]", args[0].split('/').last().unwrap());
+        info!("usage: {} [src_file] [dst_file]", args[0].split('/').last().unwrap());
         return;
     }
 
-    compress(args[1].as_str(), args[2].as_str(), VERBOSE_EN);
-
-//    let mut asdf = vec![0, 1, 2, 3, 4];
-//    asdf.remove(2);    
-//    println!("{:?}", asdf);
+    compress(args[1].as_str(), args[2].as_str());
 }
