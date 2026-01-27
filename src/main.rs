@@ -7,7 +7,7 @@ use std::fs;
 use std::process;
 
 struct Stats {
-    byte: [u32; 256],
+    weight: [u32; 256],
 }
 
 enum NodeType {
@@ -27,6 +27,18 @@ struct Treelist {
     root: Option<Box<Node>>,
 }
 
+struct CodingTable {
+  code: [Vec<u8>; 256],
+}
+
+impl CodingTable {
+  fn from_treelist(treelist: &Treelist) -> CodingTable {
+      let mut coding_table = CodingTable { code: std::array::from_fn(|_| Vec::new()) };
+      // TODO
+      coding_table
+  }
+}
+
 impl Stats {
     fn from_file(path_in: &str) -> Result<Stats, std::io::Error> {
         let data = fs::read(path_in)?;
@@ -34,18 +46,18 @@ impl Stats {
     }
 
     fn from_data(data: &Vec<u8>) -> Stats {
-        let mut stats = Stats { byte: [0; 256] };
-        for val in data.iter() {
-            stats.byte[*val as usize] += 1;
+        let mut stats = Stats { weight: [0; 256] };
+        for chr in data.iter() {
+            stats.weight[*chr as usize] += 1;
         }
         stats
     }
 
     fn print(&self) {
         debug!("stats:");
-        for (idx, elem) in self.byte.iter().enumerate() {
-            if *elem > 0 {
-                debug!("({:02X}:{})", idx, *elem);
+        for (chr, weight) in self.weight.iter().enumerate() {
+            if *weight > 0 {
+                debug!("({:02X}:{})", chr, *weight);
             }
         }
     }
@@ -54,7 +66,7 @@ impl Stats {
 impl Treelist {
     fn from_stats(stats: &Stats) -> Treelist {
         let mut treelist = Treelist { root: None };
-        for (idx, weight) in stats.byte.iter().enumerate() {
+        for (idx, weight) in stats.weight.iter().enumerate() {
             if *weight > 0 {
                 let mut new_node = Box::new(Node {
                     data: NodeType::Leaf(idx as u8),
@@ -90,14 +102,13 @@ impl Treelist {
         }
     }
 
-    //    fn add_sorted(&mut self, byte: u8, weight: u32) {
     fn add_sorted(&mut self, mut new_node: Box<Node>) {
         match new_node.data {
             NodeType::Branch => {
                 debug!("adding branch: {}", new_node.weight);
             }
-            NodeType::Leaf(byte) => {
-                debug!("adding leaf: ({:02X}:{})", byte, new_node.weight);
+            NodeType::Leaf(chr) => {
+                debug!("adding leaf: ({:02X}:{})", chr, new_node.weight);
             }
         }
         match &self.root {
@@ -230,6 +241,8 @@ fn compress(path_in: &str, path_out: &str) {
     if log_enabled!(Level::Debug) {
         treelist.print();
     }
+
+    let coding_table = CodingTable::from_treelist(&treelist);
 }
 
 fn main() {
