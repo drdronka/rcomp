@@ -33,48 +33,74 @@ struct CodingTable {
 
 impl CodingTable {
     fn from_treelist(treelist: &Treelist) -> Result<CodingTable, &str> {
-        let mut coding_table = CodingTable { code: std::array::from_fn(|_| Vec::new()) };
+        let mut coding_table = CodingTable {
+            code: std::array::from_fn(|_| Vec::new()),
+        };
         match &treelist.root {
             Some(node) => {
-                    coding_table.add_code(node, &mut Vec::<u8>::new());
-            },
+                coding_table.add_code(node, &mut Vec::<u8>::new());
+            }
             None => {
                 return Err("invalid treelist");
             }
         }
         Ok(coding_table)
     }
-    fn add_code(&mut self, root: &Node, curr_code: &mut Vec<u8>) {
+    fn add_code(&mut self, root: &Node, curr_code: &mut Vec<u8>) -> Result<(), &str> {
         match &root.data {
             NodeType::Branch => {
                 match &root.left {
                     Some(node_left) => {
                         curr_code.push(0);
-                        debug!("<--");
+                        debug!("traversing <--");
                         self.add_code(node_left, curr_code);
                         curr_code.pop();
-                    },
+                    }
                     None => {
-                        error!("invalid branch");
-                        return;
-                    },
+                        return Err("invalid branch");
+                    }
                 }
                 match &root.right {
                     Some(node_right) => {
                         curr_code.push(1);
-                        debug!("-->");
+                        debug!("traversing -->");
                         self.add_code(node_right, curr_code);
                         curr_code.pop();
-                    },
+                    }
                     None => {
-                        error!("invalid branch");
-                        return;
-                    },
+                        return Err("invalid branch");
+                    }
                 }
-            },
-            NodeType::Leaf(chr) => {},
+            }
+            NodeType::Leaf(chr) => {
+                self.code[*chr as usize] = curr_code.clone();
+                debug!(
+                    "code: ({:02X}: {})",
+                    chr,
+                    curr_code
+                        .iter()
+                        .map(|x| x.to_string())
+                        .collect::<Vec<_>>()
+                        .join("")
+                );
+            }
         }
-        return;
+        Ok(())
+    }
+    fn print(&self) {
+        debug!("coding table:");
+        for (chr, code) in self.code.iter().enumerate() {
+            if code.len() > 0 {
+                debug!(
+                    "({:02X}:{})",
+                    chr,
+                    code.iter()
+                        .map(|x| x.to_string())
+                        .collect::<Vec<_>>()
+                        .join("")
+                );
+            }
+        }
     }
 }
 
@@ -256,7 +282,7 @@ fn compress(path_in: &str, path_out: &str) {
     info!("output file: {}", path_out);
 
     info!("calculating stats");
-    let stats: Stats = match Stats::from_file(path_in) {
+    let stats = match Stats::from_file(path_in) {
         Ok(stats) => {
             if log_enabled!(Level::Debug) {
                 stats.print();
@@ -282,7 +308,12 @@ fn compress(path_in: &str, path_out: &str) {
     }
 
     let coding_table = match CodingTable::from_treelist(&treelist) {
-        Ok(table) => table,
+        Ok(table) => {
+            if log_enabled!(Level::Debug) {
+                table.print();
+            }
+            table
+        }
         Err(msg) => {
             error!("{}", msg);
             return;
