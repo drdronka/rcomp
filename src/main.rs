@@ -31,6 +31,43 @@ struct CodingTable {
     code: [Vec<u8>; 256],
 }
 
+struct BitArray {
+    data: Vec<u8>,
+    tmp: u8,
+    tmp_idx: u8,
+}
+
+impl BitArray {
+    fn encode(path_in: &str, coding_table: &CodingTable) -> Result<BitArray, std::io::Error> {
+      let data = fs::read(path_in)?;
+      let mut bit_array = BitArray { data: Vec::<u8>::new(), tmp: 0, tmp_idx: 0 };
+      for chr in data {
+        bit_array.add_char(&coding_table.code[chr as usize]);
+      }
+      bit_array.finish();
+      Ok(bit_array)
+    }
+ 
+    fn add_char(&mut self, code: &Vec<u8>) {
+      for bit in code.iter() {
+        self.tmp |= bit << self.tmp_idx;
+        self.tmp_idx += 1;
+        if self.tmp_idx >= 8 {
+          debug!("({:08b})", self.tmp);
+          self.data.push(self.tmp);
+          self.tmp = 0;
+          self.tmp_idx = 0;
+        }
+      }
+    }
+    fn finish(&mut self) {
+      debug!("({:08b}) - remainder", self.tmp);
+      self.data.push(self.tmp);
+      debug!("({:08b}) - remainder size ({})", self.tmp_idx, self.tmp_idx);
+      self.data.push(self.tmp_idx);
+    }
+}
+
 impl CodingTable {
     fn from_treelist(treelist: &Treelist) -> Result<CodingTable, &str> {
         let mut coding_table = CodingTable {
@@ -319,6 +356,9 @@ fn compress(path_in: &str, path_out: &str) {
             return;
         }
     };
+
+    info!("encoding data");
+    let bit_array = BitArray::encode(path_in, &coding_table); 
 }
 
 fn main() {
