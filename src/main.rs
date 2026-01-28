@@ -28,15 +28,54 @@ struct Treelist {
 }
 
 struct CodingTable {
-  code: [Vec<u8>; 256],
+    code: [Vec<u8>; 256],
 }
 
 impl CodingTable {
-  fn from_treelist(treelist: &Treelist) -> CodingTable {
-      let mut coding_table = CodingTable { code: std::array::from_fn(|_| Vec::new()) };
-      // TODO
-      coding_table
-  }
+    fn from_treelist(treelist: &Treelist) -> Result<CodingTable, &str> {
+        let mut coding_table = CodingTable { code: std::array::from_fn(|_| Vec::new()) };
+        match &treelist.root {
+            Some(node) => {
+                    coding_table.add_code(node, &mut Vec::<u8>::new());
+            },
+            None => {
+                return Err("invalid treelist");
+            }
+        }
+        Ok(coding_table)
+    }
+    fn add_code(&mut self, root: &Node, curr_code: &mut Vec<u8>) {
+        match &root.data {
+            NodeType::Branch => {
+                match &root.left {
+                    Some(node_left) => {
+                        curr_code.push(0);
+                        debug!("<--");
+                        self.add_code(node_left, curr_code);
+                        curr_code.pop();
+                    },
+                    None => {
+                        error!("invalid branch");
+                        return;
+                    },
+                }
+                match &root.right {
+                    Some(node_right) => {
+                        curr_code.push(1);
+                        debug!("-->");
+                        self.add_code(node_right, curr_code);
+                        curr_code.pop();
+                    },
+                    None => {
+                        error!("invalid branch");
+                        return;
+                    },
+                }
+            },
+            NodeType::Leaf(chr) => {},
+        }
+        return;
+    }
 }
 
 impl Stats {
@@ -242,7 +281,13 @@ fn compress(path_in: &str, path_out: &str) {
         treelist.print();
     }
 
-    let coding_table = CodingTable::from_treelist(&treelist);
+    let coding_table = match CodingTable::from_treelist(&treelist) {
+        Ok(table) => table,
+        Err(msg) => {
+            error!("{}", msg);
+            return;
+        }
+    };
 }
 
 fn main() {
