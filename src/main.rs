@@ -9,6 +9,8 @@ use std::fs::OpenOptions;
 use std::fs::File;
 use std::io::Write;
 use std::io::Read;
+use std::io::SeekFrom;
+use std::io::Seek;
 
 struct Stats {
     weight: [u32; 256],
@@ -169,7 +171,6 @@ impl Stats {
         for (idx, weight) in buf_u32.into_iter().enumerate() {
             stats.weight[idx as usize] = weight;
         }
-        stats.print();
         stats
     }
 
@@ -421,25 +422,54 @@ fn decompress(path_in: &str, path_out: &str) {
                 return;
             }
         };
-    debug!("reading stats");
-    let stats = Stats::read_from_file(&file);
 
+    info!("reading stats");
+    let stats = Stats::read_from_file(&file);
+    if log_enabled!(Level::Debug) {
+        stats.print();
+    }
+
+    info!("creating treelist");
+    let mut treelist = Treelist::from_stats(&stats);
+    if log_enabled!(Level::Debug) {
+        treelist.print();
+    }
+
+    info!("transforming treelist");
+    treelist.transform();
+    if log_enabled!(Level::Debug) {
+        treelist.print();
+    }
+
+    info!("reading compressed data");
+    let mut buf = Vec::<u8>::new();
+    file.seek(SeekFrom::Start((stats.weight.len() * size_of::<u32>()) as u64));
+    file.read_to_end(&mut buf);
+    info!("done ({} bytes)", buf.len());
+    
+    info!("decoding data");
+
+}
+
+fn print_help(bin_name: &str) {
+        println!("usage: {} [mode] [src_file] [dst_file]", bin_name);
+        println!("modes: -c (compress), -d (decompress)"); 
 }
 
 fn main() {
     Builder::new().filter_level(LevelFilter::Debug).init();
 //    Builder::new().filter_level(LevelFilter::Info).init();
-
     let args: Vec<String> = env::args().collect();
+    let bin_name = args[0].split('/').last().unwrap();
+
     if args.len() <= 3 {
-        info!(
-            "usage: {} [src_file] [dst_file] [dst2_file]",
-            args[0].split('/').last().unwrap()
-        );
+        print_help(bin_name);
         return;
     }
-
    
-    compress(args[1].as_str(), args[2].as_str());
-    decompress(args[2].as_str(), args[3].as_str());
+    match args[1].as_str() {
+        "-c" => compress(args[2].as_str(), args[3].as_str()),
+        "-d" => decompress(args[2].as_str(), args[3].as_str()),
+        _ => print_help(bin_name),
+    };
 }
