@@ -5,6 +5,8 @@ use log::{debug, error, info, log_enabled, Level, LevelFilter};
 use std::env;
 use std::fs;
 use std::process;
+use std::fs::OpenOptions;
+use std::io::Write;
 
 struct Stats {
     weight: [u32; 256],
@@ -358,7 +360,34 @@ fn compress(path_in: &str, path_out: &str) {
     };
 
     info!("encoding data");
-    let bit_array = BitArray::encode(path_in, &coding_table); 
+    let bit_array = match BitArray::encode(path_in, &coding_table) {
+        Ok(array) => array,
+        Err(msg) => {
+            error!("{}", msg);
+            return;
+        }
+    };
+
+    info!("writing file: {}", path_out);
+    let mut file = match OpenOptions::new()
+        .write(true)
+        .append(true)
+        .create(true)
+        .open("test_out") {
+            Ok(file_ok) => file_ok,
+            Err(msg) => {
+                error!("{}", msg);
+                return;
+            }
+        };
+    file.set_len(0);
+    for weight in &stats.weight {
+        file.write_all(&weight.to_be_bytes());
+    }
+    file.write_all(&bit_array.data);
+    file.flush();
+    info!("done");
+
 }
 
 fn main() {
@@ -373,5 +402,6 @@ fn main() {
         return;
     }
 
+   
     compress(args[1].as_str(), args[2].as_str());
 }
