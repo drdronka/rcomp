@@ -6,7 +6,9 @@ use std::env;
 use std::fs;
 use std::process;
 use std::fs::OpenOptions;
+use std::fs::File;
 use std::io::Write;
+use std::io::Read;
 
 struct Stats {
     weight: [u32; 256],
@@ -144,16 +146,30 @@ impl CodingTable {
 }
 
 impl Stats {
-    fn from_file(path_in: &str) -> Result<Stats, std::io::Error> {
+    fn calc_for_file(path_in: &str) -> Result<Stats, std::io::Error> {
         let data = fs::read(path_in)?;
-        Ok(Stats::from_data(&data))
+        Ok(Stats::calc_for_data(&data))
     }
 
-    fn from_data(data: &Vec<u8>) -> Stats {
+    fn calc_for_data(data: &Vec<u8>) -> Stats {
         let mut stats = Stats { weight: [0; 256] };
         for chr in data.iter() {
             stats.weight[*chr as usize] += 1;
         }
+        stats
+    }
+    fn read_from_file(file: &File) -> Stats {  // omg this is so bad, fix it
+        let mut stats = Stats { weight: [0; 256] };
+        let mut buf = Vec::<u8>::with_capacity(1024);
+        let mut limited = file.take(1024);
+        limited.read_to_end(&mut buf);
+        let buf_u32: Vec<u32> = buf.chunks_exact(4) 
+            .map(|chunk| u32::from_be_bytes(chunk.try_into().unwrap()))
+            .collect(); 
+        for (idx, weight) in buf_u32.into_iter().enumerate() {
+            stats.weight[idx as usize] = weight;
+        }
+        stats.print();
         stats
     }
 
@@ -321,7 +337,7 @@ fn compress(path_in: &str, path_out: &str) {
     info!("output file: {}", path_out);
 
     info!("calculating stats");
-    let stats = match Stats::from_file(path_in) {
+    let stats = match Stats::calc_for_file(path_in) {
         Ok(stats) => {
             if log_enabled!(Level::Debug) {
                 stats.print();
@@ -368,7 +384,7 @@ fn compress(path_in: &str, path_out: &str) {
         }
     };
 
-    info!("writing file: {}", path_out);
+    info!("opening file: {}", path_out);
     let mut file = match OpenOptions::new()
         .write(true)
         .append(true)
@@ -380,23 +396,44 @@ fn compress(path_in: &str, path_out: &str) {
                 return;
             }
         };
+    info!("writing stats ({} bytes)", stats.weight.len() * size_of::<u32>());
     file.set_len(0);
     for weight in &stats.weight {
         file.write_all(&weight.to_be_bytes());
     }
+    info!("writing compressed data ({} bytes)", bit_array.data.len());
     file.write_all(&bit_array.data);
     file.flush();
     info!("done");
 
 }
 
+fn decompress(path_in: &str, path_out: &str) {
+    info!("opening file: {}", path_in);
+    let mut file = match OpenOptions::new()
+        .read(true)
+        .append(true)
+        .create(true)
+        .open("test_out") {
+            Ok(file_ok) => file_ok,
+            Err(msg) => {
+                error!("{}", msg);
+                return;
+            }
+        };
+    debug!("reading stats");
+    let stats = Stats::read_from_file(&file);
+
+}
+
 fn main() {
     Builder::new().filter_level(LevelFilter::Debug).init();
+//    Builder::new().filter_level(LevelFilter::Info).init();
 
     let args: Vec<String> = env::args().collect();
-    if args.len() <= 2 {
+    if args.len() <= 3 {
         info!(
-            "usage: {} [src_file] [dst_file]",
+            "usage: {} [src_file] [dst_file] [dst2_file]",
             args[0].split('/').last().unwrap()
         );
         return;
@@ -404,4 +441,5 @@ fn main() {
 
    
     compress(args[1].as_str(), args[2].as_str());
+    decompress(args[2].as_str(), args[3].as_str());
 }
